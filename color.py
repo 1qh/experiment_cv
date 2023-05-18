@@ -8,52 +8,64 @@ from streamlit import sidebar as sb
 def p(var):
     d = globals()
     s = [f'{k} = {var}' for k in d if d[k] is var][0]
+    print(type(s))
     print(s)
 
 
-def rgb2hex(r, g, b):
-    return "#{:02x}{:02x}{:02x}".format(r, g, b)
+def _p(s):
+    print(type(s), s)
+
+
+def rgb2hex(rgb):
+    r, g, b = rgb
+    return f'#{r:02x}{g:02x}{b:02x}'
 
 
 def hex2rgb(hexcode):
     return tuple(map(ord, hexcode[1:].decode('hex')))
 
 
-colors = {
-    (196, 2, 51): 'red',
-    (255, 125, 0): 'orange',
-    (255, 205, 0): 'yellow',
-    (0, 128, 0): 'green',
-    (0, 120, 200): 'blue',
-    (127, 0, 255): 'violet',
-    (0, 0, 0): 'black',
-    (255, 255, 255): 'white',
-}
+colors_rgb = np.array(
+    [
+        [255, 0, 0],
+        [255, 100, 0],
+        [255, 200, 0],
+        [0, 150, 0],
+        [0, 100, 255],
+        [100, 0, 255],
+        [0, 0, 0],
+        [255, 255, 255],
+    ]
+)
+colors = [
+    'red',
+    'orange',
+    'yellow',
+    'green',
+    'blue',
+    'purple',
+    'black',
+    'white',
+]
 
-for color in colors:
-    sb.color_picker(f'{colors[color]}', value=rgb2hex(*color))
 
-
-def rgb2ycc(color):
-    r, g, b = [i / 255.0 for i in color]
+def rgb2ycc(rgb):
+    rgb = rgb / 255.0
+    r, g, b = rgb[:, 0], rgb[:, 1], rgb[:, 2]
     y = 0.299 * r + 0.587 * g + 0.114 * b
     cb = 128 - 0.168736 * r - 0.331364 * g + 0.5 * b
     cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
-    return y, cb, cr
+    return np.stack([y, cb, cr], axis=-1)
 
 
-def dist(c1, c2):
-    return sum((a - b) ** 2 for a, b in zip(rgb2ycc(c1), rgb2ycc(c2)))
-
-
-def closest(c, colors):
-    return min(
-        (
-            dist(c, i),
-            colors[i],
-        )
-        for i in colors
+def closest(c, colors_rgb):
+    return np.argmin(
+        np.sum((rgb2ycc(colors_rgb) - rgb2ycc(c[np.newaxis])) ** 2, axis=1)
     )
+
+
+for color, rgb in zip(colors, colors_rgb):
+    sb.color_picker(f'{color}', value=rgb2hex(rgb))
 
 
 im = sb.file_uploader('Upload image', type=['png', 'jpg', 'jpeg'])
@@ -62,7 +74,7 @@ if im:
     st.image(im, use_column_width=True)
     data = np.float32(np.reshape(im, (-1, 3)))
 
-    r, g, b = cv2.kmeans(
+    rgb = cv2.kmeans(
         data,
         1,
         None,
@@ -71,5 +83,10 @@ if im:
         cv2.KMEANS_RANDOM_CENTERS,
     )[2][0].astype(np.int32)
 
-    predict = closest((r, g, b), colors)[1]
-    avg = st.color_picker(predict, value=rgb2hex(r, g, b))
+    predict = closest(rgb, colors_rgb)
+
+    avg = st.color_picker(
+        colors[predict],
+        value=rgb2hex(colors_rgb[predict]),
+        key='a',
+    )
