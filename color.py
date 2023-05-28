@@ -36,7 +36,7 @@ colors_rgb = np.array(
         [0, 0, 0],
         [255, 255, 255],
     ]
-)
+).astype(np.uint8)
 colors = [
     'red',
     'orange',
@@ -72,8 +72,7 @@ im = sb.file_uploader('Upload image', type=['png', 'jpg', 'jpeg'])
 if im:
     im = iio.imread(im)
     st.image(im, use_column_width=True)
-    data = np.float32(np.reshape(im, (-1, 3)))
-
+    data = im.reshape(-1, 3).astype(np.float32)
     rgb = cv2.kmeans(
         data,
         1,
